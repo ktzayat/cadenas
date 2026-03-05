@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>_</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body {
+  background: #111009;
+  font-family: 'Share Tech Mono', monospace;
+  height: 100vh; width: 100vw;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+
+#flash{position:fixed;inset:0;z-index:999;pointer-events:none;opacity:0;}
+
+canvas#bg {
+  position: fixed; inset: 0; z-index: 0;
+  opacity: 0.03;
+}
+
+/* ── SCENE ── */
+#scene {
+  position: relative; z-index: 10;
+  display: flex; flex-direction: column; align-items: center;
+  width: min(420px, 96vw);
+}
+
+/* THE PADLOCK */
+#lockContainer {
+  position: relative;
+  width: 220px; height: 260px;
+  margin-bottom: 28px;
+  flex-shrink: 0;
+}
+
+#lockSvg { width:100%; height:100%; overflow:visible; }
+
+/* PUZZLE AREA */
+#puzzleArea {
+  width: 100%;
+}
+
+/* ── STAGE 1: CIPHER WHEEL ── */
+#s1 { display:flex; flex-direction:column; align-items:center; gap:16px; }
+
+.cipher-row {
+  display: flex; align-items:center; gap: 0;
+  background: #0d0b08;
+  border: 1px solid #2a2010;
+  border-radius: 3px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.cipher-label {
+  padding: 8px 10px;
+  font-size: 10px; color: #2a2010; letter-spacing:2px;
+  border-right: 1px solid #2a2010;
+  min-width: 28px; text-align:center;
+  flex-shrink: 0;
+}
+
+.cipher-scroll {
+  flex: 1;
+  overflow: hidden;
+  height: 36px;
+  position: relative;
+  cursor: ew-resize;
+}
+
+.cipher-tape {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  position: absolute; left: 0; top: 0;
+  transition: left 0.05s;
+  pointer-events: none;
+}
+
+.cipher-char {
+  width: 28px; height: 36px;
+  display: flex; align-items:center; justify-content:center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: #3a3020;
+  flex-shrink: 0;
+  transition: color 0.1s, background 0.1s;
+}
+.cipher-char.center { color: #c8a060; background: rgba(200,160,96,0.06); }
+
+.cipher-marker {
+  position: absolute; left:50%; top:0; bottom:0;
+  width: 28px; transform:translateX(-50%);
+  border-left: 1px solid rgba(200,160,96,0.2);
+  border-right: 1px solid rgba(200,160,96,0.2);
+  pointer-events: none;
+}
+
+/* Cipher answer display */
+.cipher-answer {
+  display: flex; gap: 6px; justify-content:center;
+  flex-wrap: wrap;
+}
+.cipher-slot {
+  width: 30px; height: 38px;
+  border-bottom: 2px solid #2a2010;
+  display: flex; align-items:center; justify-content:center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px; color: #2a2010;
+  transition: all 0.2s;
+}
+.cipher-slot.filled { color: #c8a060; border-bottom-color: #c8a060; }
+.cipher-slot.wrong { border-bottom-color: #8a1010; color: #8a1010; animation: shk 0.3s; }
+.cipher-slot.correct { border-bottom-color: #507040; color: #80b060; }
+
+.clue-text {
+  font-size: 11px; color: #2a2010; line-height:1.9; text-align:center;
+  letter-spacing: 1px;
+}
+.clue-text em { color: #5a4a20; font-style:normal; }
+
+/* ── STAGE 2: MECHANICAL DIALS ── */
+#s2 { display:none; flex-direction:column; align-items:center; gap:18px; }
+
+.dials-wrap {
+  display: flex; gap: 4px; align-items:stretch;
+}
+
+.dial-col {
+  display: flex; flex-direction:column; align-items:center; gap:0;
+}
+
+.dial-body {
+  width: 52px; height: 80px;
+  background: #0d0b08;
+  border: 1px solid #2a2010;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  cursor: ns-resize;
+  box-shadow: inset 0 4px 12px rgba(0,0,0,0.7);
+}
+
+.dial-inner {
+  position: absolute; left:0; right:0;
+  display: flex; flex-direction:column;
+  align-items:center;
+  transition: top 0.08s cubic-bezier(0.2,0,0.2,1);
+}
+
+.dial-n {
+  height: 26px; width:100%;
+  display:flex; align-items:center; justify-content:center;
+  font-family: 'Bebas Neue', sans-serif;
+}
+.dial-n.curr { font-size: 32px; color: #c8a060; }
+.dial-n.adj  { font-size: 18px; color: #2a2010; }
+.dial-n.far  { font-size: 12px; color: #1a1408; }
+
+.dial-shine {
+  position:absolute; top:0; left:0; right:0; height:26px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
+  pointer-events:none;
+}
+.dial-shadow {
+  position:absolute; bottom:0; left:0; right:0; height:26px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.5) 0%, transparent 100%);
+  pointer-events:none;
+}
+.dial-line {
+  position:absolute; left:4px; right:4px; height:1px;
+  background: rgba(200,160,96,0.12);
+}
+.dial-line.t { top:26px; }
+.dial-line.b { bottom:26px; }
+
+.dial-sep {
+  width: 1px; background: #1a1408; align-self:stretch;
+  margin: 0 2px;
+}
+
+.dial-submit {
+  width: 100%; padding: 10px;
+  background: #0d0b08;
+  border: 1px solid #2a2010;
+  color: #3a3020;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; letter-spacing:3px;
+  cursor:pointer; transition: all 0.15s;
+}
+.dial-submit:hover { border-color:#c8a060; color:#c8a060; }
+
+.pips { display:flex; gap:6px; justify-content:center; }
+.pip { width:7px;height:7px;border-radius:50%; background:#1a1408; transition:background 0.3s; }
+.pip.on { background:#c8a060; }
+.pip.off { background:#3a1010; }
+
+/* ── STAGE 3: SIGIL ── */
+#s3 { display:none; flex-direction:column; align-items:center; gap:16px; }
+
+.sigil-wrap {
+  position: relative;
+  width: 220px; height: 220px;
+}
+
+#sigilCanvas { width:100%; height:100%; cursor:pointer; }
+
+.sigil-hint { font-size:10px; color:#2a2010; line-height:1.9; text-align:center; }
+.sigil-progress { font-size:10px; color:#2a2010; letter-spacing:3px; text-align:center; }
+
+/* OPEN */
+#openScreen { display:none; flex-direction:column; align-items:center; gap:10px; }
+.open-word {
+  font-family:'Bebas Neue',sans-serif;
+  font-size: clamp(40px,8vw,64px);
+  color: #c8a060;
+  letter-spacing: 12px;
+  text-shadow: 0 0 40px rgba(200,160,96,0.3);
+}
+.open-sub { font-size:9px; color:#2a2010; letter-spacing:5px; }
+
+@keyframes shk { 0%,100%{transform:none} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div id="flash"></div>
+
+<div id="scene">
+
+  <!-- PADLOCK SVG -->
+  <div id="lockContainer">
+    <svg id="lockSvg" viewBox="0 0 220 260" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="bGrad" cx="35%" cy="25%">
+          <stop offset="0%" stop-color="#4a4030"/>
+          <stop offset="60%" stop-color="#2a2018"/>
+          <stop offset="100%" stop-color="#111008"/>
+        </radialGradient>
+        <radialGradient id="sGrad" cx="30%" cy="20%">
+          <stop offset="0%" stop-color="#9a8a70"/>
+          <stop offset="50%" stop-color="#6a5a40"/>
+          <stop offset="100%" stop-color="#3a3020"/>
+        </radialGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- SHACKLE GROUP -->
+      <g id="shackle" style="transition: transform 0.9s cubic-bezier(0.4,0,0.2,1); transform-origin: 110px 118px;">
+        <!-- Shadow -->
+        <path d="M76 118 L76 55 Q76 16 110 16 Q144 16 144 55 L144 118"
+          fill="none" stroke="rgba(0,0,0,0.5)" stroke-width="18" stroke-linecap="round"/>
+        <!-- Main shackle -->
+        <path d="M76 118 L76 55 Q76 16 110 16 Q144 16 144 55 L144 118"
+          fill="none" stroke="url(#sGrad)" stroke-width="14" stroke-linecap="round"/>
+        <!-- Highlight -->
+        <path d="M80 118 L80 55 Q80 22 110 22 Q140 22 140 55 L140 118"
+          fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4" stroke-linecap="round"/>
+        <!-- Wear marks -->
+        <path d="M76 90 L76 80" stroke="rgba(0,0,0,0.3)" stroke-width="2"/>
+        <path d="M144 85 L144 75" stroke="rgba(0,0,0,0.3)" stroke-width="2"/>
+      </g>
+
+      <!-- BODY shadow -->
+      <rect x="36" y="112" width="148" height="133" rx="9" fill="rgba(0,0,0,0.6)" transform="translate(3,4)"/>
+      <!-- BODY -->
+      <rect id="lockBody" x="36" y="112" width="148" height="133" rx="9" fill="url(#bGrad)"/>
+      <!-- Body top highlight -->
+      <rect x="36" y="112" width="148" height="8" rx="4" fill="rgba(255,255,255,0.05)"/>
+      <!-- Body bottom shadow -->
+      <rect x="36" y="225" width="148" height="20" rx="0 0 9 9" fill="rgba(0,0,0,0.35)"/>
+      <!-- Side light -->
+      <rect x="36" y="112" width="5" height="133" rx="2" fill="rgba(255,255,255,0.03)"/>
+
+      <!-- SCRATCHES -->
+      <line x1="60" y1="148" x2="78" y2="162" stroke="rgba(255,210,120,0.05)" stroke-width="1.5"/>
+      <line x1="63" y1="151" x2="75" y2="158" stroke="rgba(255,210,120,0.03)" stroke-width="1"/>
+      <line x1="155" y1="180" x2="170" y2="192" stroke="rgba(255,210,120,0.04)" stroke-width="1.5"/>
+      <line x1="90" y1="210" x2="102" y2="220" stroke="rgba(255,210,120,0.03)" stroke-width="1"/>
+      <line x1="148" y1="135" x2="158" y2="144" stroke="rgba(255,210,120,0.04)" stroke-width="1"/>
+
+      <!-- SHACKLE holes -->
+      <rect x="67" y="110" width="20" height="12" rx="3" fill="#090807"/>
+      <rect x="133" y="110" width="20" height="12" rx="3" fill="#090807"/>
+
+      <!-- KEYHOLE -->
+      <g transform="translate(110,178)">
+        <circle cx="0" cy="-9" r="11" fill="#090807"/>
+        <path d="M-5.5 -3 L-5.5 14 Q0 19 5.5 14 L5.5 -3 Z" fill="#090807"/>
+        <circle cx="0" cy="-9" r="11" fill="none" stroke="#2a2010" stroke-width="1.5"/>
+        <path d="M-5.5 -3 L-5.5 14 Q0 19 5.5 14 L5.5 -3 Z" fill="none" stroke="#2a2010" stroke-width="1.5"/>
+        <!-- Keyhole inner glint -->
+        <circle cx="-3" cy="-13" r="2" fill="rgba(255,255,255,0.04)"/>
+      </g>
+
+      <!-- ENGRAVING -->
+      <text x="110" y="142" text-anchor="middle"
+        font-family="'Bebas Neue',sans-serif" font-size="12"
+        fill="#1a1808" letter-spacing="4">MSB · 04</text>
+
+      <!-- STAGE indicators — 3 rivets bottom -->
+      <circle id="rv0" cx="80" cy="232" r="4" fill="#1a1808"/>
+      <circle id="rv1" cx="110" cy="232" r="4" fill="#1a1808"/>
+      <circle id="rv2" cx="140" cy="232" r="4" fill="#1a1808"/>
+    </svg>
+  </div>
+
+  <!-- PUZZLE -->
+  <div id="puzzleArea">
+
+    <!-- STAGE 1: CIPHER WHEEL -->
+    <div id="s1">
+      <div class="clue-text">
+        Quatre roues. Quatre chiffres graves dans le metal.<br>
+        <em>Un mot se cache dans le decalage.</em>
+      </div>
+
+      <!-- 4 cipher wheels — answer: MORT (Thomas Levy official death) -->
+      <!-- Each wheel is a scrollable letter tape, offset by a number engraved on lock -->
+      <!-- Engravings: 13 · 15 · 18 · 20 — ROT offsets to decode MORT -->
+      <!-- Player sees encoded: Z · D · J · N — must decode -->
+      <!-- Encoded letters: M+13=Z, O+15=D(wrap), R+18=J(wrap), T+20=N(wrap) -->
+
+      <div id="wheelRows"></div>
+
+      <div class="cipher-answer" id="cipherAnswer"></div>
+
+
+    </div>
+
+    <!-- STAGE 2: DIALS -->
+    <div id="s2">
+      <div class="clue-text" style="text-align:center">
+        4 molettes — trouver la combinaison.<br>
+        <em>Indice grave sous le cadenas :</em><br>
+        <em style="color:#3a2a10">« Reduis chaque position a un seul chiffre. »</em>
+      </div>
+      <!-- Answer: 1st=1, last=0, sum=6(13+15+18+20=66→6+6=12→nope, use 1+3+1+5+1+8+2+0=12→1+2=3)
+           Let's keep it simpler: first digit of 13=1, last digit of 20=0, sum of digits 1+3+1+5+1+8+2+0=21→2+1=3... 
+           Actually: first letter pos=13, last=20, sum=13+15+18+20=66, product tens=1*1*1*2=2
+           Code: 1 · 0 · 6 · 2  (first=1 from 13, last=0 from 20, sum digits 6+6=12 nope)
+           Let's do: first digit of each: 1,1,1,2 — nope boring
+           Better: M=13th letter, T=20th. First=1(from 13), Last=0(from 20), Middle two: O=15→5, R=18→8 → CODE: 1 5 8 0 -->
+      <div class="dials-wrap" id="dialsWrap"></div>
+      <div class="pips" id="dialPips"></div>
+      <button class="dial-submit" onclick="submitDials()">VALIDER</button>
+      <div class="clue-text" style="margin-top:4px;text-align:center">
+        <em style="color:#1a1408">Chaque erreur endommage le mecanisme.</em>
+      </div>
+    </div>
+
+    <!-- STAGE 3: SIGIL TRACE -->
+    <div id="s3">
+      <div class="clue-text" style="text-align:center">
+        Reproduire le symbole grave dans l'ordre.<br>
+        <em>Le schema apparait 3 secondes — memorise-le.</em><br>
+        <em style="color:#2a1e0a">Appuyer les points dans le bon ordre.</em>
+      </div>
+      <div class="sigil-wrap">
+        <canvas id="sigilCanvas" width="220" height="220"></canvas>
+      </div>
+      <div class="sigil-progress" id="sigilProg">— — — — —</div>
+      <div class="sigil-hint" id="sigilHint">Appuie sur MEMORISER pour voir le schema.</div>
+      <button class="dial-submit" id="sigilBtn" onclick="sigilAction()">MEMORISER</button>
+    </div>
+
+    <!-- OPEN -->
+    <div id="openScreen">
+      <div class="open-word">OUVERT</div>
+      <div class="open-sub">MSB · 04 · FORCE</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── AUDIO ─────────────────────────────────────────────────────────────────
+const AC = new(window.AudioContext||window.webkitAudioContext)();
+document.addEventListener('click',()=>AC.resume(),{once:true});
+
+function tone(freq,dur,vol,type){
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type=type||'sine'; o.frequency.value=freq;
+  g.gain.setValueAtTime(vol||0.07,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);
+  o.connect(g);g.connect(AC.destination);
+  o.start();o.stop(AC.currentTime+dur+0.01);
+}
+const click_s=()=>tone(700,0.04,0.05,'square');
+const tick_s =()=>tone(1000,0.03,0.04,'square');
+const err_s  =()=>{tone(100,0.4,0.1,'sawtooth');tone(80,0.3,0.07,'sawtooth');flash('#ff1100',0.2);}
+const ok_s   =()=>{[440,554,660].forEach((f,i)=>setTimeout(()=>tone(f,0.18,0.07,'sine'),i*80));}
+const open_s =()=>{[261,330,392,494,659].forEach((f,i)=>setTimeout(()=>tone(f,0.3,0.09,'sine'),i*110));}
+const metal_s=()=>{tone(180,0.12,0.06,'sawtooth');tone(280,0.08,0.03,'square');}
+const dial_s =()=>tone(350+Math.random()*150,0.06,0.06,'square');
+
+function flash(col,a){
+  const f=document.getElementById('flash');
+  f.style.background=col; f.style.opacity=a;
+  setTimeout(()=>f.style.opacity='0',180);
+}
+
+// ── RIVET indicators ─────────────────────────────────────────────────────
+function setRivet(i,col){ document.getElementById('rv'+i).setAttribute('fill',col); }
+
+// ══════════════════════════════════════════════════════════════════════════
+// STAGE 1 — CIPHER WHEELS
+// Encoded: Z D J N → decode with offsets 13 15 18 20 → answer: MORT
+// M(13)+13=26=Z  O(15)+15=30→4=D  R(18)+18=36→10=J  T(20)+20=40→14=N
+// ══════════════════════════════════════════════════════════════════════════
+const ALPHA='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const ENCODED=['Z','D','J','N'];
+const OFFSETS=[13,15,18,20];
+const ANSWER1='MORT';
+
+let wheelPositions=[0,0,0,0]; // current offset added (0=showing encoded letter)
+// Each wheel shows letters, starts at encoded letter
+// Player must subtract offset to get back to plaintext
+// Visual: wheel shows letters, center = current letter
+
+function initS1(){
+  setRivet(0,'#c8a060');
+  const container=document.getElementById('wheelRows');
+  container.innerHTML='';
+  container.style.cssText='display:flex;flex-direction:column;gap:6px;width:100%;';
+
+  ENCODED.forEach((enc,i)=>{
+    const encIdx=ALPHA.indexOf(enc);
+    wheelPositions[i]=0; // 0 = showing encoded letter
+
+    const row=document.createElement('div');
+    row.className='cipher-row';
+
+    const lbl=document.createElement('div');
+    lbl.className='cipher-label';
+    lbl.textContent=OFFSETS[i];
+
+    const scroll=document.createElement('div');
+    scroll.className='cipher-scroll';
+
+    const tape=document.createElement('div');
+    tape.className='cipher-tape';
+    tape.id='tape'+i;
+
+    // Build tape: 5 chars visible, lots of letters
+    // Center = current char. Show 26 letters looping.
+    for(let r=0;r<3;r++){
+      for(let c=0;c<26;c++){
+        const cd=document.createElement('div');
+        cd.className='cipher-char';
+        cd.textContent=ALPHA[c];
+        tape.appendChild(cd);
+      }
+    }
+
+    const marker=document.createElement('div');
+    marker.className='cipher-marker';
+
+    scroll.appendChild(tape);
+    scroll.appendChild(marker);
+
+    // Drag
+    let dragging=false, startX=0, startPos=0;
+    scroll.addEventListener('mousedown',e=>{
+      AC.resume();
+      dragging=true; startX=e.clientX; startPos=wheelPositions[i];
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove',e=>{
+      if(!dragging) return;
+      const dx=e.clientX-startX;
+      const steps=Math.round(dx/28);
+      wheelPositions[i]=(startPos+steps+26*10)%26;
+      updateTape(i);
+    });
+    document.addEventListener('mouseup',()=>dragging=false);
+
+    // Touch
+    scroll.addEventListener('touchstart',e=>{
+      AC.resume();
+      dragging=true; startX=e.touches[0].clientX; startPos=wheelPositions[i];
+      e.preventDefault();
+    },{passive:false});
+    document.addEventListener('touchmove',e=>{
+      if(!dragging) return;
+      const dx=e.touches[0].clientX-startX;
+      const steps=Math.round(dx/28);
+      wheelPositions[i]=(startPos+steps+26*10)%26;
+      updateTape(i);
+    });
+    document.addEventListener('touchend',()=>dragging=false);
+
+    row.appendChild(lbl); row.appendChild(scroll);
+    container.appendChild(row);
+
+    updateTape(i);
+  });
+
+  // Answer display
+  const ans=document.getElementById('cipherAnswer');
+  ans.innerHTML='';
+  for(let i=0;i<4;i++){
+    const s=document.createElement('div');
+    s.className='cipher-slot'; s.id='cslot'+i; s.textContent='_';
+    ans.appendChild(s);
+  }
+
+  // Check on every wheel change via interval
+  setInterval(checkCipher,300);
+}
+
+function updateTape(i){
+  const enc=ALPHA.indexOf(ENCODED[i]);
+  const curr=(enc - wheelPositions[i] + 26)%26;
+  const tape=document.getElementById('tape'+i);
+  if(!tape) return;
+
+  // Position tape so center char = curr
+  // Each char is 28px. Center of scroll = scroll.offsetWidth/2.
+  // We want ALPHA[curr] centered.
+  // tape has 78 chars (3*26). We want char at index 26+curr centered.
+  const scroll=tape.parentElement;
+  const W=scroll.offsetWidth||200;
+  const targetIdx=26+curr;
+  const left=W/2 - targetIdx*28 - 14;
+  tape.style.left=left+'px';
+
+  // Update colors
+  Array.from(tape.children).forEach((ch,idx)=>{
+    const charIdx=idx%26;
+    ch.className='cipher-char'+(charIdx===curr?' center':'');
+  });
+
+  tick_s();
+  updateAnswerSlot(i,ALPHA[curr]);
+  checkCipher();
+}
+
+function updateAnswerSlot(i,letter){
+  const s=document.getElementById('cslot'+i);
+  if(!s) return;
+  s.textContent=letter;
+  s.className='cipher-slot filled';
+}
+
+let cipherDone=false;
+function checkCipher(){
+  if(cipherDone) return;
+  const current=ENCODED.map((enc,i)=>{
+    const encIdx=ALPHA.indexOf(enc);
+    return ALPHA[(encIdx-wheelPositions[i]+26)%26];
+  }).join('');
+
+  if(current===ANSWER1){
+    cipherDone=true;
+    for(let i=0;i<4;i++){
+      const s=document.getElementById('cslot'+i);
+      if(s){ s.className='cipher-slot correct'; }
+    }
+    ok_s();
+    setRivet(0,'#80b060');
+    setTimeout(()=>goStage(2),1400);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// STAGE 2 — MECHANICAL DIALS
+// MORT digits: M=13,O=15,R=18,T=20
+// Code: 1st digit = 1, last digit = 0, O→5, R→8 → 1 5 8 0
+// ══════════════════════════════════════════════════════════════════════════
+const DIAL_CODE=[4,6,9,2];
+let dialVals=[0,0,0,0];
+let dialAttempts=5;
+let dialTouching=false;
+let dialStartY=0, dialStartVal=0, dialActiveIdx=-1;
+
+function initS2(){
+  setRivet(1,'#c8a060');
+  const wrap=document.getElementById('dialsWrap');
+  wrap.innerHTML='';
+
+  DIAL_CODE.forEach((_,i)=>{
+    if(i>0){
+      const sep=document.createElement('div');
+      sep.className='dial-sep';
+      wrap.appendChild(sep);
+    }
+    const col=document.createElement('div');
+    col.className='dial-col';
+    col.id='dcol'+i;
+
+    const body=document.createElement('div');
+    body.className='dial-body';
+    body.id='dbody'+i;
+
+    const inner=document.createElement('div');
+    inner.className='dial-inner';
+    inner.id='dinner'+i;
+    // fill with numbers
+    for(let n=0;n<30;n++){
+      const nn=document.createElement('div');
+      nn.className='dial-n';
+      nn.textContent=n%10;
+      inner.appendChild(nn);
+    }
+    body.appendChild(document.createElement('div')).className='dial-shine';
+    body.appendChild(document.createElement('div')).className='dial-shadow';
+    const lt=document.createElement('div');lt.className='dial-line t';
+    const lb=document.createElement('div');lb.className='dial-line b';
+    body.appendChild(lt); body.appendChild(lb);
+    body.appendChild(inner);
+
+    // drag
+    body.addEventListener('mousedown',e=>startDialDrag(e,i));
+    body.addEventListener('touchstart',e=>startDialDrag(e.touches[0],i),{passive:true});
+
+    col.appendChild(body);
+    wrap.appendChild(col);
+    updateDial2(i);
+  });
+
+  document.addEventListener('mousemove',e=>doDialDrag(e));
+  document.addEventListener('touchmove',e=>doDialDrag(e.touches[0]),{passive:true});
+  document.addEventListener('mouseup',endDialDrag);
+  document.addEventListener('touchend',endDialDrag);
+
+  // Pips
+  const pips=document.getElementById('dialPips');
+  pips.innerHTML='';
+  for(let i=0;i<dialAttempts;i++){
+    const p=document.createElement('div');
+    p.className='pip on'; p.id='dpip'+i;
+    pips.appendChild(p);
+  }
+}
+
+function startDialDrag(e,i){
+  AC.resume();
+  dialTouching=true;
+  dialActiveIdx=i;
+  dialStartY=e.clientY;
+  dialStartVal=dialVals[i];
+}
+function doDialDrag(e){
+  if(!dialTouching||dialActiveIdx<0) return;
+  const dy=dialStartY-e.clientY;
+  const steps=Math.round(dy/12);
+  const newVal=(dialStartVal+steps+100)%10;
+  if(newVal!==dialVals[dialActiveIdx]){
+    dialVals[dialActiveIdx]=newVal;
+    dial_s();
+    updateDial2(dialActiveIdx);
+  }
+}
+function endDialDrag(){ dialTouching=false; dialActiveIdx=-1; }
+
+function updateDial2(i){
+  const inner=document.getElementById('dinner'+i);
+  if(!inner) return;
+  const v=dialVals[i];
+  // Position so digit v is centered (each digit 26px, center at 40px from top)
+  inner.style.top=(40-v*26-13)+'px';
+  Array.from(inner.children).forEach((n,idx)=>{
+    const dist=Math.abs(idx%10-v);
+    const d2=Math.min(dist,10-dist);
+    n.className='dial-n'+(d2===0?' curr':d2===1?' adj':' far');
+  });
+}
+
+function submitDials(){
+  AC.resume();
+  const correct=DIAL_CODE.every((v,i)=>v===dialVals[i]);
+  if(correct){
+    ok_s(); setRivet(1,'#80b060');
+    metal_s();
+    setTimeout(()=>goStage(3),1200);
+  } else {
+    dialAttempts--;
+    err_s();
+    if(dialAttempts>=0){
+      const p=document.getElementById('dpip'+dialAttempts);
+      if(p) p.className='pip off';
+    }
+    if(dialAttempts<=0){
+      // Full reset
+      setTimeout(()=>{
+        dialAttempts=5;
+        dialVals=[0,0,0,0];
+        for(let i=0;i<5;i++){const p=document.getElementById('dpip'+i);if(p)p.className='pip on';}
+        for(let i=0;i<4;i++) updateDial2(i);
+      },1500);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// STAGE 3 — SIGIL MEMORY TRACE
+// Player sees a pattern of 5 nodes connected in order, must reproduce it
+// ══════════════════════════════════════════════════════════════════════════
+const SIGIL_NODES = [
+  {x:110,y:30},   // 0 top
+  {x:195,y:88},   // 1 right top
+  {x:165,y:185},  // 2 right bot
+  {x:55,y:185},   // 3 left bot
+  {x:25,y:88},    // 4 left top
+  {x:110,y:110},  // 5 center
+  {x:110,y:70},   // 6 inner top
+  {x:155,y:145},  // 7 inner right
+  {x:65,y:145},   // 8 inner left
+];
+// Secret order: 0 → 2 → 4 → 1 → 3 → 5
+const SIGIL_ORDER=[0,2,4,1,3,5];
+let sigilPhase='idle'; // idle, show, input
+let sigilInput=[];
+let sigilDone=false;
+
+function initS3(){
+  setRivet(2,'#c8a060');
+  drawSigilIdle();
+}
+
+const sc=document.getElementById('sigilCanvas');
+const sctx=sc.getContext('2d');
+const SR=sc.width;
+
+function drawSigilIdle(){
+  sctx.clearRect(0,0,SR,SR);
+  // Draw just the nodes, dim
+  SIGIL_NODES.forEach((n,i)=>{
+    sctx.beginPath();
+    sctx.arc(n.x,n.y,7,0,Math.PI*2);
+    sctx.fillStyle='#1a1408';
+    sctx.fill();
+    sctx.strokeStyle='#2a2010';
+    sctx.lineWidth=1.5;
+    sctx.stroke();
+  });
+}
+
+function drawSigilReveal(){
+  sctx.clearRect(0,0,SR,SR);
+
+  // Draw solution path
+  sctx.beginPath();
+  sctx.strokeStyle='rgba(200,160,96,0.4)';
+  sctx.lineWidth=1.5;
+  sctx.setLineDash([4,4]);
+  SIGIL_ORDER.forEach((ni,idx)=>{
+    const n=SIGIL_NODES[ni];
+    if(idx===0) sctx.moveTo(n.x,n.y);
+    else sctx.lineTo(n.x,n.y);
+  });
+  sctx.stroke();
+  sctx.setLineDash([]);
+
+  // Draw nodes with order numbers
+  SIGIL_NODES.forEach((n,ni)=>{
+    const orderIdx=SIGIL_ORDER.indexOf(ni);
+    const active=orderIdx>=0;
+    sctx.beginPath();
+    sctx.arc(n.x,n.y,8,0,Math.PI*2);
+    sctx.fillStyle=active?'rgba(200,160,96,0.15)':'#0d0b08';
+    sctx.fill();
+    sctx.strokeStyle=active?'#c8a060':'#1a1408';
+    sctx.lineWidth=1.5;
+    sctx.stroke();
+    if(active){
+      sctx.fillStyle='#c8a060';
+      sctx.font='bold 11px Share Tech Mono';
+      sctx.textAlign='center';
+      sctx.textBaseline='middle';
+      sctx.fillText(orderIdx+1,n.x,n.y);
+    }
+  });
+}
+
+function drawSigilInput(){
+  sctx.clearRect(0,0,SR,SR);
+
+  // Draw input path so far
+  if(sigilInput.length>1){
+    sctx.beginPath();
+    sctx.strokeStyle='rgba(200,160,96,0.3)';
+    sctx.lineWidth=1.5;
+    sigilInput.forEach((ni,idx)=>{
+      const n=SIGIL_NODES[ni];
+      if(idx===0) sctx.moveTo(n.x,n.y);
+      else sctx.lineTo(n.x,n.y);
+    });
+    sctx.stroke();
+  }
+
+  // Nodes
+  SIGIL_NODES.forEach((n,ni)=>{
+    const inputIdx=sigilInput.indexOf(ni);
+    const isActive=SIGIL_ORDER.includes(ni);
+    sctx.beginPath();
+    sctx.arc(n.x,n.y,8,0,Math.PI*2);
+    if(inputIdx>=0) sctx.fillStyle='rgba(200,160,96,0.2)';
+    else if(isActive) sctx.fillStyle='rgba(200,160,96,0.05)';
+    else sctx.fillStyle='#0d0b08';
+    sctx.fill();
+    sctx.strokeStyle=inputIdx>=0?'#c8a060':isActive?'#2a2010':'#1a1408';
+    sctx.lineWidth=1.5;
+    sctx.stroke();
+    if(inputIdx>=0){
+      sctx.fillStyle='#c8a060';
+      sctx.font='bold 11px Share Tech Mono';
+      sctx.textAlign='center';
+      sctx.textBaseline='middle';
+      sctx.fillText(inputIdx+1,n.x,n.y);
+    }
+  });
+
+  // Progress
+  const prog=Array(SIGIL_ORDER.length).fill('—');
+  sigilInput.forEach((_,i)=>prog[i]='●');
+  document.getElementById('sigilProg').textContent=prog.join(' ');
+}
+
+function sigilAction(){
+  AC.resume();
+  const btn=document.getElementById('sigilBtn');
+  if(sigilPhase==='idle'){
+    sigilPhase='show';
+    btn.textContent='...'; btn.disabled=true;
+    drawSigilReveal();
+    document.getElementById('sigilHint').textContent='Memorise le schema — 4 secondes.';
+    setTimeout(()=>{
+      sigilPhase='input';
+      sigilInput=[];
+      btn.style.display='none';
+      drawSigilInput();
+      document.getElementById('sigilHint').textContent='Reproduire dans le bon ordre.';
+    },4000);
+  }
+}
+
+sc.addEventListener('click',e=>{
+  if(sigilPhase!=='input'||sigilDone) return;
+  AC.resume();
+  const rect=sc.getBoundingClientRect();
+  const scaleX=SR/rect.width;
+  const scaleY=SR/rect.height;
+  const mx=(e.clientX-rect.left)*scaleX;
+  const my=(e.clientY-rect.top)*scaleY;
+
+  // Find closest active node
+  let best=-1,bestD=999;
+  SIGIL_ORDER.forEach(ni=>{
+    if(sigilInput.includes(ni)) return;
+    const n=SIGIL_NODES[ni];
+    const d=Math.hypot(mx-n.x,my-n.y);
+    if(d<bestD){ bestD=d; best=ni; }
+  });
+
+  if(best<0||bestD>30) return;
+
+  // Check if correct next
+  const expected=SIGIL_ORDER[sigilInput.length];
+  if(best===expected){
+    sigilInput.push(best);
+    tick_s();
+    drawSigilInput();
+    if(sigilInput.length===SIGIL_ORDER.length){
+      sigilDone=true;
+      ok_s(); setRivet(2,'#80b060');
+      document.getElementById('sigilHint').textContent='schema valide';
+      document.getElementById('sigilProg').textContent='● ● ● ● ● ●';
+      setTimeout(()=>doOpen(),1000);
+    }
+  } else {
+    err_s();
+    document.getElementById('sigilHint').textContent='mauvais ordre — recommencer';
+    sigilInput=[];
+    setTimeout(()=>{
+      sigilPhase='idle';
+      drawSigilIdle();
+      document.getElementById('sigilProg').textContent='— — — — — —';
+      document.getElementById('sigilHint').textContent='Appuie sur MEMORISER pour voir le schema.';
+      const btn=document.getElementById('sigilBtn');
+      btn.style.display='';btn.disabled=false;btn.textContent='MEMORISER';
+    },1000);
+  }
+});
+
+// ── OPEN ─────────────────────────────────────────────────────────────────
+function doOpen(){
+  open_s(); metal_s();
+  setTimeout(metal_s,200);
+
+  // Animate shackle up
+  const shackle=document.getElementById('shackle');
+  shackle.style.transform='translateY(-40px) rotate(-8deg)';
+
+  setTimeout(()=>{
+    ['s1','s2','s3'].forEach(id=>document.getElementById(id).style.display='none');
+    const os=document.getElementById('openScreen');
+    os.style.display='flex';
+    os.style.animation='fadeIn 0.6s ease';
+  },800);
+}
+
+// ── STAGE NAV ─────────────────────────────────────────────────────────────
+function goStage(n){
+  document.getElementById('s1').style.display='none';
+  document.getElementById('s2').style.display='none';
+  document.getElementById('s3').style.display='none';
+
+  if(n===2){ document.getElementById('s2').style.display='flex'; initS2(); }
+  if(n===3){ document.getElementById('s3').style.display='flex'; initS3(); }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+window.addEventListener('load',()=>{ initS1(); });
+</script>
+</body>
+</html>
